@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+# Eigen Includes
+Eigen/
+unsupported/
