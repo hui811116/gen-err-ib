@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <iomanip>
+#include <fstream>
 
 using std::cout;
 using std::endl;
@@ -82,6 +83,8 @@ int main(){
 	Vec px(4);
 	px << 0.25, 0.25, 0.25 ,0.25;
 	Mat pxy = (pycx*px.asDiagonal()).transpose();
+	cout<<"pycx"<<endl<<pycx<<endl;
+	cout<<"px"<<endl<<px<<endl;
 	cout<<"I(X;Y)="<<calcMI(pxy)<<endl;
 	Vec py = pxy.colwise().sum();
 	Mat pxcy = pxy * ((1.0/py.array()).matrix()).asDiagonal();
@@ -89,20 +92,8 @@ int main(){
 	size_t xdim = pycx.cols();
 
 	// make sure the IB is implemented right...
-	/*
-	double beta = 1.0;
-	double beta_inc = 1.0;
-	for(size_t ib = 0;ib<40;++ib){
-		algout_t output = ibOrig(pxy,pycx.cols(),beta,1e-6,10000);
-		Mat tmp_pzcy = output.pzcx * pxcy;
-		double mizy = calcMI(tmp_pzcy * py.asDiagonal());
-		double mizx = calcMI(output.pzcx * px.asDiagonal());
-		cout<<beta<<","<<mizy<<","<<mizx<<","<<output.converge<<endl;
-		beta += beta_inc;
-	}
-	*/
 	
-	double kl_thres = 0.8;
+	double kl_thres = 1.0;               // change the threshold as constraints
 	size_t crude_len = 20;
 	double eps_crude[crude_len];
 	double eps_init = 0.01;
@@ -131,19 +122,26 @@ int main(){
 	Vec crude_px(xdim);
 
 	size_t nrun = 40;
-	cout<<std::setw(6)<<"beta,"\
-		<<std::setw(16)<<"IXY,"\
-		<<std::setw(16)<<"kl_model,"\
-		<<std::setw(16)<<"kl_train,"\
-		<<std::setw(16)<<"kl_x,"\
-		<<std::setw(16)<<"kl_y,";
+	cout<<std::setw(5)<<"beta,"\
+		<<std::setw(12)<<"IXY_t,"\
+		<<std::setw(12)<<"IXY_e,"\
+		<<std::setw(12)<<"kl_model,"\
+		<<std::setw(12)<<"kl_train,"\
+		<<std::setw(12)<<"kl_x,"\
+		<<std::setw(12)<<"kl_y,";
 	for(size_t tt=0;tt<xdim;++tt){
-		cout<<std::setw(16)<<"kl_ycx_"<<tt;
+		cout<<std::setw(12)<<"kl_ycx_"<<tt;
 		if(tt==xdim-1)
 			cout<<endl;
 		else
 			cout<<",";
 	}
+
+	// prepare the IO head
+	std::fstream fid;
+	fid.open( "gen_bisearch_output.txt",std::fstream::out);
+	fid<<pycx<<endl;
+	fid<<px<<endl;
 
 	double beta = 1.0;
 	double beta_inc = 0.5;
@@ -247,6 +245,7 @@ int main(){
 		double worst_kl_train = 0;
 		double worst_kl_x =0;
 		double worst_kl_y = 0;
+		double worst_mi_eps = 0;
 		Vec worst_kl_ycx (xdim);
 		Mat worst_eps_pycx (pycx.rows(),xdim);
 		Vec worst_eps_px (xdim);
@@ -291,6 +290,7 @@ int main(){
 							worst_kl_x = calcKL(crude_px,px);
 							worst_kl_y = calcKL(detail_py,best_py);
 							worst_kl_ycx = (crude_pycx.array() * (crude_pycx.array().log()-(best_pycx.array()+1e-9).log())).matrix().colwise().sum();
+							worst_mi_eps = calcMI(crude_pycx * crude_px.asDiagonal());
 							// copy the worst Mat and Vec?
 							worst_eps_pycx = crude_pycx;
 							worst_eps_px = crude_px;
@@ -334,14 +334,15 @@ int main(){
 		//Mat worst_pxy = (crude_eps_pycx * crude_eps_px.asDiagonal()).transpose();
 		//Vec worst_py = worst_pxy.colwise().sum();
 		// after two-way grid search, print the result
-		cout<<std::setw(6)<<beta<<","\
-		<<std::setw(16)<<best_mi<<","\
-		<<std::setw(16)<<worst_err<<","\
-		<<std::setw(16)<<worst_kl_train<<","\
-		<<std::setw(16)<<worst_kl_x<<","\
-		<<std::setw(16)<<worst_kl_y<<",";
+		cout<<std::setw(5)<<beta<<","\
+		<<std::setw(12)<<best_mi<<","\
+		<<std::setw(12)<<worst_mi_eps<<","\
+		<<std::setw(12)<<worst_err<<","\
+		<<std::setw(12)<<worst_kl_train<<","\
+		<<std::setw(12)<<worst_kl_x<<","\
+		<<std::setw(12)<<worst_kl_y<<",";
 		for(size_t tt=0;tt<xdim;++tt){
-			cout<<std::setw(16)<<worst_kl_ycx(tt);
+			cout<<std::setw(12)<<worst_kl_ycx(tt);
 			if(tt!=xdim-1)
 				cout<<",";
 		}
@@ -350,5 +351,8 @@ int main(){
 	} // for(double beta=1.0.......)
 	
 	
+	// closing the fstream head
+	fid.close();
+
 	return 0;
 }
