@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iterator>
 #include <string>
 #include "Eigen/Dense"
 #include "unsupported/Eigen/MatrixFunctions"
@@ -6,9 +7,12 @@
 #include <cstdio>
 #include <iomanip>
 #include <fstream>
+#include <boost/program_options.hpp>
 
+namespace po = boost::program_options;
 using std::cout;
 using std::endl;
+using std::cerr;
 
 typedef Eigen::MatrixXd Mat;
 typedef Eigen::VectorXd Vec;
@@ -75,13 +79,78 @@ algout_t ibOrig(const Mat& pxy,size_t nz, double beta, double thres, size_t maxi
 	return output;
 }
 
-int main(){
+int main(int ac, char** av){
+	Mat pycx;
+	Vec px;
+	double kl_thres,beta,beta_inc;               // change the threshold as constraints
+	try{
+		double thres,bstep;
+		std::string dsel;
+		po::options_description desc("Allowed options");
+		desc.add_options()
+			("help","display available options")
+			("threshold",po::value<double>(&thres)->default_value(1.0), "set the constraint threshold")
+			("betastep",po::value<double>(&bstep)->default_value(1.0), "set the value for beta increment")
+			("dataset",po::value<std::string>(&dsel)->default_value("sim23"), "choose from [sim23,sim24]")
+		;
+
+		po::variables_map vm;
+		po::store(po::parse_command_line(ac,av,desc),vm);
+		po::notify(vm);
+
+		if (vm.count("help")){
+			cout<<desc<<endl;
+			return 0;
+		}
+		
+		if (vm.count("threshold")){
+			cout<<std::setw(30)<<std::left<<"constraint threshold:"
+				<< std::setw(10)<<std::right<<vm["threshold"].as<double>() << endl;
+		}else{
+			cout<< "default threshold:" << std::setw(10)<<std::right<<vm["threshold"].as<double>() << endl;
+		}
+		kl_thres = vm["threshold"].as<double>();
+
+		cout<<std::setw(30)<<std::left<<"beta increment:"
+			<<std::setw(10)<<std::right<<vm["betastep"].as<double>() << endl;
+		beta_inc = vm["betastep"].as<double>();
+
+		if (vm.count("dataset")){
+			cout<<std::setw(30)<<std::left<<"set data to:"
+				<<std::setw(10)<<std::right<<vm["dataset"].as<std::string>()<< endl;
+
+		}else{
+			cout<<std::setw(30)<<std::left<<"default data:"
+				<<std::setw(10)<<std::right<<vm["dataset"].as<std::string>()<<endl;
+		}
+		std::string arg_data = vm["dataset"].as<std::string>();
+		if (arg_data.compare("sim23")==0){
+			pycx.resize(2,4);
+			pycx << 0.90, 0.76, 0.15, 0.06,
+				0.10, 0.24, 0.85, 0.94;
+			px.resize(4);
+			px << 0.25, 0.25, 0.25 ,0.25;
+		}else if(arg_data.compare("sim24")==0){
+			pycx.resize(2,3);
+			pycx << 0.90, 0.76, 0.06,
+					0.10, 0.24, 0.94;
+			px.resize(3);
+			px << 0.33, 0.34, 0.33;
+		}else{
+			cerr<<"undefined dataset, abort..."<<endl;
+			return 1;
+		}		
+
+	}catch(std::exception& e){
+		cerr<< "error: "<<e.what()<<endl;
+		return 1;
+	}catch(...){
+		cerr<< "Exception of unknown type!"<<endl;
+	}
+
 	srand((unsigned int) time(0));
-	Mat pycx(2,4);
-	pycx << 0.90, 0.76, 0.15, 0.06,
-			0.10, 0.24, 0.85, 0.94;
-	Vec px(4);
-	px << 0.25, 0.25, 0.25 ,0.25;
+	
+
 	Mat pxy = (pycx*px.asDiagonal()).transpose();
 	cout<<"pycx"<<endl<<pycx<<endl;
 	cout<<"px"<<endl<<px<<endl;
@@ -93,7 +162,7 @@ int main(){
 
 	// make sure the IB is implemented right...
 	
-	double kl_thres = 1.0;               // change the threshold as constraints
+	
 	size_t crude_len = 20;
 	double eps_crude[crude_len];
 	double eps_init = 0.01;
@@ -143,8 +212,8 @@ int main(){
 	fid<<"[pycx_train]"<<endl<<pycx<<endl;
 	fid<<"[px_train]"<<endl<<px<<endl;
 
-	double beta = 1.0;
-	double beta_inc = 1.0;
+	
+	
 	for(size_t ib=0; ib<20; ib++){
 		Mat best_pycx (pycx.rows(),xdim);
 		double best_mi = 0;
