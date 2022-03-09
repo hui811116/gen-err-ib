@@ -140,12 +140,12 @@ int main(){
 	// prepare the IO head
 	std::fstream fid;
 	fid.open( "gen_bisearch_output.txt",std::fstream::out);
-	fid<<pycx<<endl;
-	fid<<px<<endl;
+	fid<<"[pycx_train]"<<endl<<pycx<<endl;
+	fid<<"[px_train]"<<endl<<px<<endl;
 
 	double beta = 1.0;
-	double beta_inc = 0.5;
-	for(size_t ib=0; ib<32; ib++){
+	double beta_inc = 1.0;
+	for(size_t ib=0; ib<20; ib++){
 		Mat best_pycx (pycx.rows(),xdim);
 		double best_mi = 0;
 		for(size_t nn=0;nn<nrun;nn++){
@@ -347,6 +347,12 @@ int main(){
 				cout<<",";
 		}
 		cout<<endl;
+		// write the matrices
+		fid<<"[beta]"<<endl<<beta<<endl;
+		fid<<"[best_pycx]"<<endl<<best_pycx<<endl;
+		fid<<"[eps_pycx]"<<endl<<worst_eps_pycx<<endl;
+		fid<<"[eps_px]"<<endl<<worst_eps_px<<endl;
+
 		beta += beta_inc;
 	} // for(double beta=1.0.......)
 	

@@ -34,3 +34,9 @@
 # Eigen Includes
 Eigen/
 unsupported/
+
+# OSX
+*.dSYM
+
+# textfile
+*.txt
