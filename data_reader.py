@@ -103,10 +103,13 @@ train_py = np.sum(train_pyx,axis=1)
 mi_train = calcMI(train_pycx*train_px[None,:])
 print('IXY_train,{:10.5f}'.format(mi_train))
 integrate_results = []
+'''
 print('{:8s},{:10s},{:10s},{:10s},{:10s},{:10s},{:10s},{:10s},{:10s},{:10s},{:10s}'.format(
 	'beta','mi_model','mi_eps','kl_model','kl_train','kl_eps_x','kl_eps_y','kl_model_y',
 	'var_model_hycx','theory','py',
 	))
+'''
+test_tight_bounds = []
 for item in result_dict['beta_res']:
 	beta = item['beta']
 	best_pycx = item['best_pycx']
@@ -120,7 +123,9 @@ for item in result_dict['beta_res']:
 
 	best_mi = calcMI(best_pyx)
 	eps_mi = calcMI(eps_pyx)
+
 	# all kld
+	kl_fit = calcKL(best_pyx,train_pyx)
 	kl_train = calcKL(eps_pyx,train_pyx)
 	kl_model = calcKL(eps_pyx,best_pyx)
 	kl_eps_x = calcKL(eps_px,train_px)
@@ -128,17 +133,48 @@ for item in result_dict['beta_res']:
 	kl_model_y = calcKL(best_py,train_py)
 	# we also need the entropy vector
 	model_hycx = np.sum(-best_pycx*np.log(best_pycx),axis=0)
+	eps_hycx = np.sum(-eps_pycx*np.log(eps_pycx),axis=0)
 	# what matter is the sample variance of this vector
 	var_model_hycx = np.var(model_hycx)
+
+	ent_epsy = np.sum(-eps_py*np.log(eps_py))
+	ent_besty= np.sum(-best_py*np.log(best_py))
+	condent_eps = np.sum(-eps_pyx*np.log(eps_pycx))
+	condent_best= np.sum(-best_pyx*np.log(best_pycx))
+	diff_eb_enty = ent_epsy - ent_besty
+	diff_be_condent= condent_best-condent_eps
+
+	#print(diff_eb_enty,diff_be_condent)
+	#print(eps_hycx-model_hycx)
+
+	# first, checking the tightness of the bounds
+	var_logy = np.var(np.log(1/best_py)) # replace delta H(Y)
+	norm_pydiff = np.linalg.norm(best_py-eps_py)
+	ex_hycx_diff = np.sum(eps_px*np.sqrt( (eps_hycx-model_hycx)**2 ))
+	pxdiff_2norm = np.linalg.norm(eps_px- train_px)
+	pydiff_2norm = np.linalg.norm(eps_py- best_py)
+	bd_mi_step1 = pydiff_2norm*np.sqrt(var_logy)+kl_eps_x+ex_hycx_diff+pxdiff_2norm*np.sqrt(var_model_hycx)
 
 	# estimated bound
 	thebd = 0.5* var_model_hycx + len(best_py)*(1/np.exp(1)) + 2*threshold - kl_model_y
 	# pythagorean bound
 	pybd = np.abs(best_mi-eps_mi) + kl_eps_x+kl_eps_y
 
+	test_tight_bounds.append([beta,kl_model,kl_train,kl_eps_x,kl_eps_y,thebd,pybd,bd_mi_step1])
 	integrate_results.append([beta,best_mi,eps_mi,kl_model,kl_train,kl_eps_x,kl_eps_y,kl_model_y,var_model_hycx,thebd,pybd])
+	'''
 	print('{:8.4f},{:10.5f},{:10.5f},{:10.5f},{:10.5f},{:10.5f},{:10.5f},{:10.5f},{:10.5f},{:10.5f},{:10.5f}'.format(
 			beta,best_mi,eps_mi,kl_model,kl_train,kl_eps_x,kl_eps_y,kl_model_y,var_model_hycx,thebd,pybd
 		))
-
+	'''
 np_results =np.array(integrate_results)
+
+# testing the tightness of potential bounds
+print("{:>10s},{:>10s},{:>10s},{:>10s},{:>10s},{:>10s},{:>10s},{:>10s}".format(
+		'beta','kl_model','kl_train','kl_epsx','kl_epsy',
+		'theory','py','MI_step1',
+	))
+
+for item in test_tight_bounds:
+	tmplist = ['{:10.6f}'.format(ele) for ele in item]
+	print(','.join(tmplist))
