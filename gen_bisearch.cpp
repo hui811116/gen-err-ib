@@ -83,14 +83,17 @@ int main(int ac, char** av){
 	Mat pycx;
 	Vec px;
 	double kl_thres,beta,beta_inc;               // change the threshold as constraints
+	size_t nbeta;
 	try{
 		double thres,bstep;
+		int nbe;
 		std::string dsel;
 		po::options_description desc("Allowed options");
 		desc.add_options()
 			("help","display available options")
 			("threshold",po::value<double>(&thres)->default_value(1.0), "set the constraint threshold")
 			("betastep",po::value<double>(&bstep)->default_value(1.0), "set the value for beta increment")
+			("betanum",po::value<int>(&nbe)->default_value(20), "number of beta for sweeping")
 			("dataset",po::value<std::string>(&dsel)->default_value("sim23"), "choose from [sim23,sim24]")
 		;
 
@@ -103,6 +106,7 @@ int main(int ac, char** av){
 			return 0;
 		}
 		
+		// thresholds of KL
 		if (vm.count("threshold")){
 			cout<<std::setw(30)<<std::left<<"constraint threshold:"
 				<< std::setw(10)<<std::right<<vm["threshold"].as<double>() << endl;
@@ -110,11 +114,23 @@ int main(int ac, char** av){
 			cout<< "default threshold:" << std::setw(10)<<std::right<<vm["threshold"].as<double>() << endl;
 		}
 		kl_thres = vm["threshold"].as<double>();
-
+		// beta increment
 		cout<<std::setw(30)<<std::left<<"beta increment:"
 			<<std::setw(10)<<std::right<<vm["betastep"].as<double>() << endl;
 		beta_inc = vm["betastep"].as<double>();
+		
+		// number of beta
+		if (vm.count("betanum")){
+			cout<<std::setw(30)<<std::left<<"# of beta:"
+				<<std::setw(10)<<std::right<<vm["betanum"].as<int>()<<endl;
+		} else{
+			cout<<std::setw(30)<<std::left<<"default # of beta:"
+				<<std::setw(10)<<std::right<<vm["betanum"].as<int>()<<endl;
+		}
+		nbe = vm["betanum"].as<int>();
+		nbeta = (nbe>0)? (size_t)nbe : 1;
 
+		// datasets to run
 		if (vm.count("dataset")){
 			cout<<std::setw(30)<<std::left<<"set data to:"
 				<<std::setw(10)<<std::right<<vm["dataset"].as<std::string>()<< endl;
@@ -123,14 +139,15 @@ int main(int ac, char** av){
 			cout<<std::setw(30)<<std::left<<"default data:"
 				<<std::setw(10)<<std::right<<vm["dataset"].as<std::string>()<<endl;
 		}
+
 		std::string arg_data = vm["dataset"].as<std::string>();
-		if (arg_data.compare("sim23")==0){
+		if (arg_data.compare("sim24")==0){
 			pycx.resize(2,4);
 			pycx << 0.90, 0.76, 0.15, 0.06,
 				0.10, 0.24, 0.85, 0.94;
 			px.resize(4);
 			px << 0.25, 0.25, 0.25 ,0.25;
-		}else if(arg_data.compare("sim24")==0){
+		}else if(arg_data.compare("sim23")==0){
 			pycx.resize(2,3);
 			pycx << 0.90, 0.76, 0.06,
 					0.10, 0.24, 0.94;
@@ -213,8 +230,8 @@ int main(int ac, char** av){
 	fid<<"[px_train]"<<endl<<px<<endl;
 
 	
-	
-	for(size_t ib=0; ib<20; ib++){
+	beta= 1.0;
+	for(size_t ib=0; ib<nbeta; ib++){
 		Mat best_pycx (pycx.rows(),xdim);
 		double best_mi = 0;
 		for(size_t nn=0;nn<nrun;nn++){
