@@ -238,7 +238,7 @@ int main(int ac, char** av){
 	cout<<"pycx"<<endl<<pycx<<endl;
 	cout<<"px"<<endl<<px<<endl;
 	cout<<"I(X;Y)="<<calcMI(pxy)<<endl;
-	cout<<"sample I(X;Y)="<<calcMI(samp_pxy)<<endl;
+	
 	Vec py = pxy.colwise().sum();
 	Mat pxcy = pxy * ((1.0/py.array()).matrix()).asDiagonal();
 
@@ -253,6 +253,7 @@ int main(int ac, char** av){
 	Mat samp_pxcy = samp_pxy * ((1.0/samp_py.array()).matrix()).asDiagonal();
 	Mat samp_pycx = (((1.0/samp_px.array()).matrix()).asDiagonal() *samp_pxy).transpose();
 	double mi_samp = calcMI(samp_pxy);
+	cout<<"sample I(X;Y)="<<mi_samp<<endl;
 	// make sure the IB is implemented right...
 	
 	size_t crude_len = 20;
