@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <iomanip>
 #include <fstream>
+#include <sstream>
 #include <boost/program_options.hpp>
 
 namespace po = boost::program_options;
@@ -143,10 +144,10 @@ int main(int ac, char** av){
 	Mat pycx;
 	Vec px;
 	double kl_thres,beta,beta_inc;               // change the threshold as constraints
-	size_t nbeta;
+	size_t nbeta,num_samp;
 	try{
 		double thres,bstep;
-		int nbe;
+		int nbe,nsm;
 		std::string dsel;
 		po::options_description desc("Allowed options");
 		desc.add_options()
@@ -155,6 +156,7 @@ int main(int ac, char** av){
 			("betastep",po::value<double>(&bstep)->default_value(1.0), "set the value for beta increment")
 			("betanum",po::value<int>(&nbe)->default_value(20), "number of beta for sweeping")
 			("dataset",po::value<std::string>(&dsel)->default_value("sim23"), "choose from [sim23,sim24]")
+			("nsamp",po::value<int>(&nsm)->default_value(100), "number of finite samples")
 		;
 
 		po::variables_map vm;
@@ -189,6 +191,11 @@ int main(int ac, char** av){
 		}
 		nbe = vm["betanum"].as<int>();
 		nbeta = (nbe>0)? (size_t)nbe : 1;
+
+		nsm = vm["nsamp"].as<int>();
+		num_samp = (nsm>0)? (size_t)nsm : 100;
+		cout<<std::setw(30)<<std::left<<"number of samples:"
+			<<std::setw(10)<<std::right<<vm["nsamp"].as<int>()<<endl;
 
 		// datasets to run
 		if (vm.count("dataset")){
@@ -231,6 +238,7 @@ int main(int ac, char** av){
 	cout<<"pycx"<<endl<<pycx<<endl;
 	cout<<"px"<<endl<<px<<endl;
 	cout<<"I(X;Y)="<<calcMI(pxy)<<endl;
+	cout<<"sample I(X;Y)="<<calcMI(smap_pxy)<<endl;
 	Vec py = pxy.colwise().sum();
 	Mat pxcy = pxy * ((1.0/py.array()).matrix()).asDiagonal();
 
@@ -238,8 +246,13 @@ int main(int ac, char** av){
 
 	// generate samples
 
-	//sample_t samp_out = genSampPxy(100,pxy);
-
+	sample_t samp_out = genSampPxy(num_samp,pxy);
+	Mat samp_pxy = samp_out.samp_pxy;
+	Vec samp_py = samp_pxy.colwise().sum();
+	Vec samp_px = samp_pxy.rowwise().sum();
+	Mat samp_pxcy = samp_pxy * ((1.0/samp_py.array()).matrix()).asDiagonal();
+	Mat samp_pycx = (((1.0/samp_px.array()).matrix()).asDiagonal() *samp_pxy).transpose();
+	double mi_samp = calcMI(samp_pxy);
 	// make sure the IB is implemented right...
 	
 	size_t crude_len = 20;
@@ -273,10 +286,13 @@ int main(int ac, char** av){
 	cout<<std::setw(5)<<"beta,"\
 		<<std::setw(12)<<"IXY_t,"\
 		<<std::setw(12)<<"IXY_e,"\
+		<<std::setw(12)<<"IXY_s,"\
 		<<std::setw(12)<<"kl_model,"\
 		<<std::setw(12)<<"kl_train,"\
+		<<std::setw(12)<<"kl_clean,"\
 		<<std::setw(12)<<"kl_x,"\
 		<<std::setw(12)<<"kl_y,";
+	/*
 	for(size_t tt=0;tt<xdim;++tt){
 		cout<<std::setw(12)<<"kl_ycx_"<<tt;
 		if(tt==xdim-1)
@@ -284,22 +300,31 @@ int main(int ac, char** av){
 		else
 			cout<<",";
 	}
+	*/
 
 	// prepare the IO head
 	std::fstream fid;
-	fid.open( "gen_bisearch_output.txt",std::fstream::out);
+	//char buffer[100];
+	//std::sprintf("gen_samp_adv_n%d_output",num_samp);
+	std::string ss="";
+	ss += "gen_samp_adv_n";
+	ss += std::to_string(num_samp);
+	ss += ".txt";
+	fid.open(ss,std::fstream::out);
 	fid<<"[pycx_train]"<<endl<<pycx<<endl;
 	fid<<"[px_train]"<<endl<<px<<endl;
-
+	fid<<"[pxy_samp]"<<endl<<samp_pxy<<endl;
 	
 	beta= 1.0;
 	for(size_t ib=0; ib<nbeta; ib++){
 		Mat best_pycx (pycx.rows(),xdim);
 		double best_mi = 0;
 		for(size_t nn=0;nn<nrun;nn++){
-			algout_t output = ibOrig(pxy,xdim,beta,1e-6,10000);
+			//algout_t output = ibOrig(pxy,xdim,beta,1e-6,10000);
+			algout_t output = ibOrig(samp_pxy,xdim,beta,1e-6,10000);
 			// calculate the required metrics
-			Mat tmp_pzy = output.pzcx *pxy;
+			//Mat tmp_pzy = output.pzcx *pxy;
+			Mat tmp_pzy = output.pzcx *samp_pxy;
 			Vec pz_rci = (1.0/(tmp_pzy.rowwise().sum()).array()).matrix();
 			Mat tmp_pycz = ( pz_rci.asDiagonal() * tmp_pzy   ).transpose();
 			Mat tmp_pycx = tmp_pycz * output.pzcx;
@@ -311,9 +336,11 @@ int main(int ac, char** av){
 		}
 		// FIXME: why best mi = 0?
 		// now we have the best predictor now
-		Mat best_pxy = (best_pycx * px.asDiagonal()).transpose();
+		//Mat best_pxy = (best_pycx * px.asDiagonal()).transpose();
+		Mat best_pxy = (best_pycx * samp_px.asDiagonal()).transpose();
 		Vec best_py = best_pxy.colwise().sum();
 		// perform a crude search
+		double kl_clean = calcKL(pxy,best_pxy);
 		// TODO: make this whole thing a function
 		double crude_err = 0.0;
 		Mat crude_eps_pycx (pycx.rows(),xdim);
@@ -352,7 +379,8 @@ int main(int ac, char** av){
 					Mat tmp_crude_pxy  = (crude_pycx * crude_px.asDiagonal()).transpose();
 					// calculate the error
 					double kl_model = calcKL(tmp_crude_pxy,best_pxy);
-					double kl_train = calcKL(tmp_crude_pxy,pxy);
+					//double kl_train = calcKL(tmp_crude_pxy,pxy);
+					double kl_train =calcKL(tmp_crude_pxy,samp_pxy);
 					if( (kl_train< kl_thres) &&  (kl_model>crude_err) ){
 						crude_err = kl_model;
 						crude_eps_pycx = crude_pycx;
@@ -430,12 +458,14 @@ int main(int ac, char** av){
 						Mat detail_pxy = (crude_pycx * crude_px.asDiagonal()).transpose();
 						Vec detail_py = detail_pxy.colwise().sum();
 						double kl_model = calcKL(detail_pxy,best_pxy);
-						double kl_train = calcKL(detail_pxy,pxy);
+						//double kl_train = calcKL(detail_pxy,pxy);
+						double kl_train = calcKL(detail_pxy,samp_pxy);
 						if(kl_train<kl_thres && kl_model>worst_err ){
 							// a valid divergence
 							worst_err = kl_model;
 							worst_kl_train = kl_train;
-							worst_kl_x = calcKL(crude_px,px);
+							//worst_kl_x = calcKL(crude_px,px);
+							worst_kl_x = calcKL(crude_px,samp_px);
 							worst_kl_y = calcKL(detail_py,best_py);
 							worst_kl_ycx = (crude_pycx.array() * (crude_pycx.array().log()-(best_pycx.array()+1e-9).log())).matrix().colwise().sum();
 							worst_mi_eps = calcMI(crude_pycx * crude_px.asDiagonal());
@@ -485,16 +515,20 @@ int main(int ac, char** av){
 		cout<<std::setw(5)<<beta<<","\
 		<<std::setw(12)<<best_mi<<","\
 		<<std::setw(12)<<worst_mi_eps<<","\
+		<<std::setw(12)<<mi_samp<<","\
 		<<std::setw(12)<<worst_err<<","\
 		<<std::setw(12)<<worst_kl_train<<","\
+		<<std::setw(12)<<kl_clean<<","\
 		<<std::setw(12)<<worst_kl_x<<","\
 		<<std::setw(12)<<worst_kl_y<<",";
+		/*
 		for(size_t tt=0;tt<xdim;++tt){
 			cout<<std::setw(12)<<worst_kl_ycx(tt);
 			if(tt!=xdim-1)
 				cout<<",";
 		}
 		cout<<endl;
+		*/
 		// write the matrices
 		fid<<"[beta]"<<endl<<beta<<endl;
 		fid<<"[best_pycx]"<<endl<<best_pycx<<endl;
