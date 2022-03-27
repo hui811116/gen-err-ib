@@ -1,6 +1,6 @@
 CXX=g++
 CPPFLAGS= -std=c++11
-BOOST_PATH=/home/hui/tools
+BOOST_PATH=/Users/hui/project/tools
 
 INCLUDE= -I ./Eigen/\
 		 -I ./unsupported/\
