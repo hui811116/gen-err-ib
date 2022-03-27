@@ -238,7 +238,7 @@ int main(int ac, char** av){
 	cout<<"pycx"<<endl<<pycx<<endl;
 	cout<<"px"<<endl<<px<<endl;
 	cout<<"I(X;Y)="<<calcMI(pxy)<<endl;
-	cout<<"sample I(X;Y)="<<calcMI(smap_pxy)<<endl;
+	cout<<"sample I(X;Y)="<<calcMI(samp_pxy)<<endl;
 	Vec py = pxy.colwise().sum();
 	Mat pxcy = pxy * ((1.0/py.array()).matrix()).asDiagonal();
 
