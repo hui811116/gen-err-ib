@@ -309,6 +309,7 @@ int main(int ac, char** av){
 			cout<<",";
 	}
 	*/
+	cout<<endl;
 
 	// prepare the IO head
 	std::fstream fid;
@@ -537,6 +538,7 @@ int main(int ac, char** av){
 		}
 		cout<<endl;
 		*/
+		cout<<endl;
 		// write the matrices
 		fid<<"[beta]"<<endl<<beta<<endl;
 		fid<<"[best_pycx]"<<endl<<best_pycx<<endl;
@@ -549,6 +551,6 @@ int main(int ac, char** av){
 	
 	// closing the fstream head
 	fid.close();
-
+	cout<<"saving the results to:"<<ss<<endl;
 	return 0;
 }
