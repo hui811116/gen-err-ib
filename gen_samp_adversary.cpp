@@ -63,6 +63,8 @@ sample_t genSampPxy(int nsamp,const Mat& pxy){
 	// gen y samples
 	Vec y_samp = Vec(nsamp);
 	Vec y_prob = Vec::Random(nsamp);
+	y_prob.array() += 1.00;
+	y_prob.array() *= 0.5;
 	for(size_t nn=0;nn<nsamp;++nn){
 		int ytmp = 0;
 		for(size_t ny=0;ny<pxy.cols();++ny){
@@ -77,9 +79,11 @@ sample_t genSampPxy(int nsamp,const Mat& pxy){
 	// gen x samples
 	Vec x_samp = Vec(nsamp);
 	Vec x_prob = Vec::Random(nsamp);
+	x_prob.array() += 1.00;
+	x_prob.array() *= 0.5;
+	//cout<<x_prob<<endl;
 	for(size_t nn=0;nn<nsamp;++nn){
 		//cout<<static_cast<int>(y_samp[nn]);
-		int xtmp = 0;
 		for(size_t nx=0;nx<pxy.rows();++nx){		
 			if(x_prob[nn]<=cumsum_pxcy(nx,static_cast<int>(y_samp[nn]))){
 				x_samp[nn] = nx;
@@ -248,12 +252,15 @@ int main(int ac, char** av){
 
 	sample_t samp_out = genSampPxy(num_samp,pxy);
 	Mat samp_pxy = samp_out.samp_pxy;
+
 	Vec samp_py = samp_pxy.colwise().sum();
 	Vec samp_px = samp_pxy.rowwise().sum();
 	Mat samp_pxcy = samp_pxy * ((1.0/samp_py.array()).matrix()).asDiagonal();
 	Mat samp_pycx = (((1.0/samp_px.array()).matrix()).asDiagonal() *samp_pxy).transpose();
 	double mi_samp = calcMI(samp_pxy);
 	cout<<"sample I(X;Y)="<<mi_samp<<endl;
+	//cout<<samp_pxy<<endl;
+	//return 0;
 	// make sure the IB is implemented right...
 	
 	size_t crude_len = 20;
