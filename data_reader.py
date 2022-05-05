@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 args = sys.argv
 
 threshold = float(args[2])
-result_dict = {'beta_res':[],'pycx_train':None,'px_train':None}
+result_dict = {'beta_res':[],'pycx_train':None,'px_train':None,'samp_pxy':None}
 
 with open(args[1],"r") as fid:
 	allraw_lines = fid.readlines()
@@ -20,7 +20,7 @@ with open(args[1],"r") as fid:
 		if "[beta]" in all_lines[idx]:
 			idx +=1
 			tmp_beta = float(all_lines[idx].strip())
-			tmp_res = {'beta':tmp_beta,'best_pycx':None,'pycx_eps':None,'px_eps':None}
+			tmp_res = {'beta':tmp_beta,'best_pycx':None,'pycx_eps':None,'px_eps':None,}
 			idx+=1
 		elif "[pycx_train]" in all_lines[idx]:
 			idx += 1
@@ -84,6 +84,16 @@ with open(args[1],"r") as fid:
 				if "[" in all_lines[idx]:
 					tmp_res['pycx_eps'] = np.array(tmp_mat)
 					break
+		elif "[pxy_samp]" in all_lines[idx]:
+			idx+=1
+			tmp_mat=[]
+			while idx+1 < len(all_lines):
+				line_ele = [float(item) for item in all_lines[idx].strip().split()]
+				tmp_mat.append(line_ele)
+				idx+=1
+				if "[" in all_lines[idx]:
+					result_dict['samp_pxy'] = np.array(tmp_mat)
+					break
 		else:
 			print('untracked line:{}'.format(all_lines[idx]))
 			idx+=1
@@ -102,17 +112,25 @@ train_pyx = train_pycx * train_px[None,:]
 train_py = np.sum(train_pyx,axis=1)
 mi_train = calcMI(train_pycx*train_px[None,:])
 print('IXY_train,{:10.5f}'.format(mi_train))
+samp_pxy = result_dict['samp_pxy']
+samp_px = np.sum(samp_pxy,axis=0)
+samp_py = np.sum(samp_pxy,axis=1)
+mi_samp = calcMI(samp_pxy)
 integrate_results = []
 
+'''
 hdr = ['beta','mi_model','mi_eps',
 	   'kl_model','kl_train','kl_fit',
 	   'kl_eps_x','kl_eps_y','kl_model_y','var_model_hycx',
 	   'var_logy','theory','pybd','e2bd','pybd_rev'
 	   ]
+'''
+hdr = ['beta','mi_model','mi_samp','mi_eps','kl_model','kl_samp']
 
 print(','.join(['{:<8s}'.format(item) for item in hdr]))
 
 test_tight_bounds = []
+adv_sim = []
 for item in result_dict['beta_res']:
 	beta = item['beta']
 	best_pycx = item['best_pycx']
@@ -167,10 +185,11 @@ for item in result_dict['beta_res']:
 	# e2_set, bound
 	e2bd = threshold - kl_fit
 
-	test_tight_bounds.append([beta,kl_model,kl_train,kl_fit,kl_eps_x,kl_eps_y,thebd,pybd,bd_mi_step1,e2bd])
-	tmp_container = [beta,best_mi,eps_mi,kl_model,kl_train,kl_fit,kl_eps_x,kl_eps_y,kl_model_y,var_model_hycx,var_logy,thebd,pybd,e2bd,pybd_rev]
-	integrate_results.append(tmp_container)
-	print(','.join(['{:10.6f}'.format(item) for item in tmp_container]))
+	#test_tight_bounds.append([beta,kl_model,kl_train,kl_fit,kl_eps_x,kl_eps_y,thebd,pybd,bd_mi_step1,e2bd])
+	#tmp_container = [beta,best_mi,eps_mi,kl_model,kl_train,kl_fit,kl_eps_x,kl_eps_y,kl_model_y,var_model_hycx,var_logy,thebd,pybd,e2bd,pybd_rev]
+	#integrate_results.append(tmp_container)
+	#print(','.join(['{:10.6f}'.format(item) for item in tmp_container]))
+	print(','.join(['{:10.6f}'.format(item) for item in adv_sim]))
 	
 np_results =np.array(integrate_results)
 
