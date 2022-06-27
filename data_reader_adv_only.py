@@ -113,8 +113,8 @@ train_py = np.sum(train_pyx,axis=1)
 mi_train = calcMI(train_pycx*train_px[None,:])
 print('IXY_train,{:10.5f}'.format(mi_train))
 samp_pxy = result_dict['samp_pxy']
-samp_px = np.sum(samp_pxy,axis=0)
-samp_py = np.sum(samp_pxy,axis=1)
+samp_px = np.sum(samp_pxy,axis=1)
+samp_py = np.sum(samp_pxy,axis=0)
 mi_samp = calcMI(samp_pxy)
 integrate_results = []
 
@@ -125,16 +125,17 @@ hdr = ['beta','mi_model','mi_eps',
 	   'var_logy','theory','pybd','e2bd','pybd_rev'
 	   ]
 '''
-hdr = ['beta','mi_model','mi_samp','mi_eps','kl_model','kl_samp']
+hdr = ['beta','mi_model','mi_eps','mi_samp','kl_model','kl_train','kl_clean','kl_miss']
 
 print(','.join(['{:<8s}'.format(item) for item in hdr]))
 
 test_tight_bounds = []
-adv_sim = []
+#adv_sim = []
 for item in result_dict['beta_res']:
 	beta = item['beta']
 	best_pycx = item['best_pycx']
-	best_pyx = best_pycx*train_px[None,:]
+	#best_pyx = best_pycx*train_px[None,:]
+	best_pyx = best_pycx * samp_px[None,:]
 	best_py = np.sum(best_pyx,axis=1)
 	eps_px = item['px_eps']
 	eps_pycx = item['pycx_eps']
@@ -146,14 +147,26 @@ for item in result_dict['beta_res']:
 	eps_mi = calcMI(eps_pyx)
 
 	# all kld
-	kl_fit = calcKL(best_pyx,train_pyx)
-	kl_train = calcKL(eps_pyx,train_pyx)
-	kl_model = calcKL(eps_pyx,best_pyx)
-	kl_eps_x = calcKL(eps_px,train_px)
-	kl_eps_x_rev = calcKL(train_px,eps_px)
+	#kl_fit = calcKL(best_pyx,train_pyx)
+	#kl_fit  = calcKL(best_pyx,samp_pxy.T) # 
+	#kl_train = calcKL(eps_pyx,train_pyx)
+	kl_train = calcKL(eps_pyx,samp_pxy.T)   # this is the adversarial constraint
+	kl_model = calcKL(eps_pyx,best_pyx)     # this is the adversarial error
+	#kl_eps_x = calcKL(eps_px,train_px)
+	kl_eps_x = calcKL(eps_px,samp_px)
+	#kl_eps_x_rev = calcKL(train_px,eps_px)
+	kl_eps_x_rev = calcKL(samp_px,eps_px)
 	kl_eps_y = calcKL(eps_py,best_py)
 	kl_eps_y_rev = calcKL(best_py,eps_py)
-	kl_model_y = calcKL(best_py,train_py)
+
+	#for clean case
+	kl_clean_x = calcKL(train_px,samp_px)
+	kl_clean_y = calcKL(train_py,samp_py)
+
+	kl_clean = calcKL(train_pyx,best_pyx) # this is the standard learning error
+	kl_miss  = calcKL(train_pyx,samp_pxy.T) # this is the standard learning constraint
+
+	#kl_model_y = calcKL(best_py,train_py)
 	# we also need the entropy vector
 	model_hycx = np.sum(-best_pycx*np.log(best_pycx),axis=0)
 	eps_hycx = np.sum(-eps_pycx*np.log(eps_pycx),axis=0)
@@ -178,13 +191,14 @@ for item in result_dict['beta_res']:
 	bd_mi_step1 = pydiff_2norm*np.sqrt(var_logy)+kl_eps_x+ex_hycx_diff+pxdiff_2norm*np.sqrt(var_model_hycx)
 
 	# estimated bound
-	thebd = 0.5* var_model_hycx + len(best_py)*(1/np.exp(1)) + 2*threshold - kl_model_y
+	#thebd = 0.5* var_model_hycx + len(best_py)*(1/np.exp(1)) + 2*threshold - kl_model_y
 	# pythagorean bound
-	pybd = eps_mi-best_mi + kl_eps_x+kl_eps_y
-	pybd_rev = best_mi - eps_mi + kl_eps_x_rev + kl_eps_y_rev
+	#pybd = eps_mi-best_mi + kl_eps_x+kl_eps_y
+	#pybd_rev = best_mi - eps_mi + kl_eps_x_rev + kl_eps_y_rev
 	# e2_set, bound
-	e2bd = threshold - kl_fit
+	#e2bd = threshold - kl_fit
 
+	adv_sim = [beta,best_mi,eps_mi,mi_samp,kl_model,kl_train,kl_clean,kl_miss]
 	#test_tight_bounds.append([beta,kl_model,kl_train,kl_fit,kl_eps_x,kl_eps_y,thebd,pybd,bd_mi_step1,e2bd])
 	#tmp_container = [beta,best_mi,eps_mi,kl_model,kl_train,kl_fit,kl_eps_x,kl_eps_y,kl_model_y,var_model_hycx,var_logy,thebd,pybd,e2bd,pybd_rev]
 	#integrate_results.append(tmp_container)
